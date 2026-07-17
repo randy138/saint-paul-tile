@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dog Wash — Laundry/Mud Room — 2464 S Saint Paul St</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#1c1e22;font-family:'Helvetica Neue',Arial,sans-serif;}
+  #app{position:fixed;inset:0;}
+  #hud{position:fixed;top:16px;left:16px;background:rgba(20,22,26,.82);color:#e8e8e6;
+       padding:14px 18px;border-radius:10px;max-width:300px;backdrop-filter:blur(6px);
+       border:1px solid rgba(255,255,255,.08);}
+  #hud h1{font-size:15px;margin:0 0 2px;font-weight:600;letter-spacing:.3px;}
+  #hud .sub{font-size:11px;color:#9aa0a8;margin-bottom:10px;}
+  #hud ul{margin:0;padding:0;list-style:none;font-size:12px;line-height:1.7;color:#c9cdd3;}
+  #hud ul b{color:#fff;font-weight:600;}
+  #hint{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);
+        color:#8b9099;font-size:12px;background:rgba(20,22,26,.7);padding:6px 14px;border-radius:20px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="hud">
+  <h1>Dog Wash — Laundry / Mud Room</h1>
+  <div class="sub">2464 S Saint Paul St — 2nd Floor</div>
+  <ul>
+    <li><b>Station:</b> 36" W × 30" D, raised 14", tiled pan</li>
+    <li><b>Pan &amp; base:</b> greige penny round pan; slab front face</li>
+    <li><b>Walls:</b> stop at top of surround tile (50" AFF), slab cap</li>
+    <li><b>Surround:</b> 3" × 9" glossy off-white subway, 36" above pan</li>
+    <li><b>Niche:</b> 12" × 12" — dog line-art tile on penny field</li>
+    <li><b>Accents:</b> 2 black pebble paw mosaics set in the pan floor</li>
+    <li><b>Fixtures:</b> chrome hand shower on slide bar</li>
+  </ul>
+</div>
+<div id="hint">Drag to orbit &nbsp;·&nbsp; Scroll / pinch to zoom</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+"use strict";
+const W=36, D=30, H=96;
+const PLAT=14;                 // platform / pan rim height
+const TILE_TOP=PLAT+36;        // surround top (36" above pan)
+const PX=8;
+
+function makeCanvas(wIn,hIn,px){
+  const p=px||PX;
+  const c=document.createElement('canvas');
+  c.width=Math.max(4,Math.round(wIn*p));
+  c.height=Math.max(4,Math.round(hIn*p));
+  return c;
+}
+function finishTexture(c){
+  const t=new THREE.CanvasTexture(c);
+  t.encoding=THREE.sRGBEncoding; t.anisotropy=8;
+  return t;
+}
+// black pebble paw print
+function drawPaw(ctx,cx,cy,s){
+  ctx.save();
+  ctx.fillStyle='#1c1d1f';
+  // main pad (rounded triangle)
+  ctx.beginPath();
+  ctx.moveTo(cx, cy-0.10*s);
+  ctx.bezierCurveTo(cx+0.42*s, cy-0.05*s, cx+0.46*s, cy+0.42*s, cx, cy+0.5*s);
+  ctx.bezierCurveTo(cx-0.46*s, cy+0.42*s, cx-0.42*s, cy-0.05*s, cx, cy-0.10*s);
+  ctx.fill();
+  // toes
+  const toes=[[-0.42,-0.28,0.13,0.19,-0.35],[-0.15,-0.45,0.14,0.20,-0.12],
+              [0.15,-0.45,0.14,0.20,0.12],[0.42,-0.28,0.13,0.19,0.35]];
+  toes.forEach(t=>{
+    ctx.save();
+    ctx.translate(cx+t[0]*s, cy+t[1]*s);
+    ctx.rotate(t[4]);
+    ctx.beginPath();
+    ctx.ellipse(0,0,t[2]*s,t[3]*s,0,0,7);
+    ctx.fill();
+    ctx.restore();
+  });
+  // soft sheen
+  ctx.fillStyle='rgba(255,255,255,0.10)';
+  ctx.beginPath(); ctx.ellipse(cx-0.08*s,cy+0.08*s,0.18*s,0.10*s,0.5,0,7); ctx.fill();
+  ctx.restore();
+}
+// glossy off-white 3x9 subway, half offset, with optional paw accents
+function subwayCanvas(wIn,hIn,paws){
+  const c=makeCanvas(wIn,hIn), ctx=c.getContext('2d');
+  ctx.fillStyle='#cfccc4'; ctx.fillRect(0,0,c.width,c.height);
+  const TW=9*PX, TH=3*PX, G=1.0;
+  for(let r=0;r<Math.ceil(hIn/3)+1;r++){
+    const off=(r%2)? -TW/2 : 0;
+    for(let col=-1; col<=Math.ceil(wIn/9)+1; col++){
+      const x=col*TW+off, y=r*TH;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(x+G,y+G,TW-2*G,TH-2*G); ctx.clip();
+      const s=238+Math.floor(Math.random()*8)-3;
+      ctx.fillStyle='rgb('+s+','+(s-2)+','+(s-8)+')';
+      ctx.fillRect(x,y,TW,TH);
+      ctx.fillStyle='rgba(255,255,255,'+(0.06+Math.random()*0.10)+')';
+      ctx.fillRect(x,y,TW,TH/3);
+      ctx.restore();
+    }
+  }
+  (paws||[]).forEach(p=>drawPaw(ctx,p[0]*PX,(hIn-p[1])*PX,p[2]*PX));
+  return c;
+}
+// greige penny round, white grout; optional paw accents at inch coords
+function pennyCanvas(wIn,hIn,paws){
+  const P=16;
+  const c=makeCanvas(wIn,hIn,P), ctx=c.getContext('2d');
+  ctx.fillStyle='#f4f2ee'; ctx.fillRect(0,0,c.width,c.height);
+  const d=0.75*P, r=d/2, sx=0.85*P, sy=0.736*P;
+  for(let row=0; row*sy<c.height+d; row++){
+    for(let q=-1; q*sx<c.width+d; q++){
+      const cx=q*sx+((row%2)?sx/2:0), cy=row*sy;
+      const v=214+Math.floor(Math.random()*10)-4;
+      const g=ctx.createRadialGradient(cx-r*0.3,cy-r*0.3,r*0.2,cx,cy,r);
+      g.addColorStop(0,'rgb('+(v+6)+','+(v+4)+','+(v-2)+')');
+      g.addColorStop(1,'rgb('+v+','+(v-2)+','+(v-9)+')');
+      ctx.beginPath(); ctx.arc(cx,cy,r*0.92,0,7); ctx.fillStyle=g; ctx.fill();
+    }
+  }
+  (paws||[]).forEach(p=>{
+    ctx.save();
+    ctx.translate(p[0]*P,(hIn-p[1])*P);
+    ctx.rotate(p[3]||0);
+    drawPaw(ctx,0,0,p[2]*P);
+    ctx.restore();
+  });
+  return c;
+}
+// niche back: dog line-art tile (9.75") centered on penny field (12x12)
+function nicheCanvas(){
+  const P=24;
+  const c=makeCanvas(12,12,P), ctx=c.getContext('2d');
+  // penny border field
+  const pc=pennyCanvas(12,12);
+  ctx.drawImage(pc,0,0,c.width,c.height);
+  // dog tile
+  const t0=(12-9.75)/2*P, ts=9.75*P;
+  ctx.fillStyle='#fbfaf7'; ctx.fillRect(t0,t0,ts,ts);
+  ctx.strokeStyle='#d8d5cd'; ctx.lineWidth=1.5; ctx.strokeRect(t0,t0,ts,ts);
+  // simple line-art dog faces (2x2)
+  ctx.strokeStyle='#17181a'; ctx.lineWidth=2.4; ctx.lineCap='round';
+  const faces=[[0.28,0.28,0.16],[0.72,0.30,0.14],[0.30,0.72,0.14],[0.70,0.70,0.16]];
+  faces.forEach(f=>{
+    const fx=t0+f[0]*ts, fy=t0+f[1]*ts, fr=f[2]*ts;
+    ctx.beginPath(); ctx.arc(fx,fy,fr,0,7); ctx.stroke();                     // head
+    ctx.beginPath(); ctx.ellipse(fx-fr*0.95,fy-fr*0.15,fr*0.3,fr*0.55,0.5,0,7); ctx.stroke(); // ear L
+    ctx.beginPath(); ctx.ellipse(fx+fr*0.95,fy-fr*0.15,fr*0.3,fr*0.55,-0.5,0,7); ctx.stroke();// ear R
+    ctx.fillStyle='#17181a';
+    ctx.beginPath(); ctx.arc(fx-fr*0.32,fy-fr*0.15,fr*0.07,0,7); ctx.fill();  // eyes
+    ctx.beginPath(); ctx.arc(fx+fr*0.32,fy-fr*0.15,fr*0.07,0,7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(fx,fy+fr*0.22,fr*0.14,fr*0.10,0,0,7); ctx.fill(); // nose
+    ctx.beginPath(); ctx.moveTo(fx,fy+fr*0.32); ctx.quadraticCurveTo(fx+fr*0.2,fy+fr*0.52,fx+fr*0.35,fy+fr*0.4); ctx.stroke(); // smile
+  });
+  return c;
+}
+function slabCanvas(wIn,hIn){
+  const c=makeCanvas(wIn,hIn), ctx=c.getContext('2d');
+  ctx.fillStyle='#f0efe9'; ctx.fillRect(0,0,c.width,c.height);
+  return c;
+}
+// checkerboard room floor (context, matches laundry)
+function diagCheckerCanvas(wIn,hIn){
+  const c=makeCanvas(wIn,hIn,4), ctx=c.getContext('2d');
+  const P4=4;
+  ctx.fillStyle='#c6c6c6'; ctx.fillRect(0,0,c.width,c.height);
+  const T=12*P4, G=0.8;
+  ctx.save();
+  ctx.translate(c.width/2,c.height/2);
+  ctx.rotate(Math.PI/4);
+  const ext=Math.ceil((wIn+hIn)/12);
+  for(let i=-ext;i<=ext;i++){
+    for(let j=-ext;j<=ext;j++){
+      const x=i*T, y=j*T;
+      const gray=((i+j)%2+2)%2===0;
+      const v=gray?196:246;
+      ctx.fillStyle='rgb('+v+','+v+','+(v+2)+')';
+      ctx.fillRect(x+G,y+G,T-2*G,T-2*G);
+    }
+  }
+  ctx.restore();
+  return c;
+}
+
+function texMat(canvas,rough){
+  return new THREE.MeshStandardMaterial({map:finishTexture(canvas),roughness:rough,metalness:0.02});
+}
+const wallMat=new THREE.MeshStandardMaterial({color:0xd9d4cc,roughness:0.9});
+const whitePaint=new THREE.MeshStandardMaterial({color:0xf2f1ee,roughness:0.6});
+const chrome=new THREE.MeshStandardMaterial({color:0xd8dde2,roughness:0.18,metalness:0.95});
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x24262b);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.setSize(window.innerWidth,window.innerHeight);
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputEncoding=THREE.sRGBEncoding;
+document.getElementById('app').appendChild(renderer.domElement);
+const camera=new THREE.PerspectiveCamera(46,window.innerWidth/window.innerHeight,1,2000);
+
+function box(w,h,d,mats,x,y,z){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mats);
+  m.position.set(x,y,z);
+  m.castShadow=true; m.receiveShadow=true;
+  scene.add(m); return m;
+}
+
+// room floor (checkerboard context)
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(200,160),texMat(diagCheckerCanvas(200,160),0.4));
+floor.rotation.x=-Math.PI/2;
+floor.position.set(W/2,0.02,D/2-50);
+floor.receiveShadow=true;
+scene.add(floor);
+
+// walls: back z=D, sides x=0 / x=W. surround tile PLAT..TILE_TOP, painted above.
+// paw accents: back wall gets 2, each side wall gets 1 (heights are inches above pan)
+// pony walls: stop at the top of the surround tile, slab cap on top
+function wallX(cx, idx, pawSpots){
+  const tiled=texMat(subwayCanvas(D,36,pawSpots),0.15);
+  const mats=[wallMat,wallMat,wallMat,wallMat,wallMat,wallMat]; mats[idx]=tiled;
+  box(4,36,D,mats,cx,PLAT+18,D/2);
+  box(4,PLAT,D,[wallMat,wallMat,wallMat,wallMat,wallMat,wallMat],cx,PLAT/2,D/2);
+  const wcap=new THREE.Mesh(new THREE.BoxGeometry(5.5,1,D+1),texMat(slabCanvas(7,34),0.25));
+  wcap.position.set(cx,TILE_TOP+0.5,D/2);
+  wcap.castShadow=true; wcap.receiveShadow=true; scene.add(wcap);
+}
+wallX(-2,0,[]);                 // right wall (viewed) — no accents
+wallX(W+2,1,[]);                // left wall — no accents
+// back wall with 12x12 niche (centered, bottom 16" above pan)
+const NX0=12,NX1=24,NY0=PLAT+16,NY1=NY0+12,ND=3.5;
+const backTex=finishTexture(subwayCanvas(W,36,[]));  // no accents on surround
+function backPiece(x0,x1,y0,y1){
+  const t=backTex.clone(); t.needsUpdate=true;
+  t.offset.set((W-x1)/W,(y0-PLAT)/36); t.repeat.set((x1-x0)/W,(y1-y0)/36);
+  const m=new THREE.MeshStandardMaterial({map:t,roughness:0.15,metalness:0.02});
+  box(x1-x0,y1-y0,4,[wallMat,wallMat,wallMat,wallMat,wallMat,m],(x0+x1)/2,(y0+y1)/2,D+2);
+}
+backPiece(0,W,PLAT,NY0);
+backPiece(0,W,NY1,TILE_TOP);
+backPiece(0,NX0,NY0,NY1);
+backPiece(NX1,W,NY0,NY1);
+box(W,PLAT,4,wallMat,W/2,PLAT/2,D+2);
+// slab cap across the back pony wall (runs corner to corner over the side caps)
+const bcap=new THREE.Mesh(new THREE.BoxGeometry(W+9,1,5.5),texMat(slabCanvas(46,7),0.25));
+bcap.position.set(W/2,TILE_TOP+0.5,D+2);
+bcap.castShadow=true; bcap.receiveShadow=true; scene.add(bcap);
+// niche interior: slab returns + dog art back
+const slabM=()=>texMat(slabCanvas(14,5),0.3);
+box(12,0.75,ND,slabM(),18,NY0+0.38,D+ND/2);
+box(12,0.75,ND,slabM(),18,NY1-0.38,D+ND/2);
+box(0.75,12,ND,slabM(),NX0+0.38,(NY0+NY1)/2,D+ND/2);
+box(0.75,12,ND,slabM(),NX1-0.38,(NY0+NY1)/2,D+ND/2);
+const nb=new THREE.Mesh(new THREE.PlaneGeometry(12,12),texMat(nicheCanvas(),0.3));
+nb.rotation.y=Math.PI; nb.position.set(18,(NY0+NY1)/2,D+ND-0.05);
+nb.receiveShadow=true; scene.add(nb);
+
+// ---- raised platform with tiled penny pan ----
+// rim walls (3" wide) around a recessed basin; penny everywhere, slab cap on rim
+const pennyM=()=>texMat(pennyCanvas(40,18),0.5);
+box(W,PLAT,3,texMat(slabCanvas(38,16),0.3),W/2,PLAT/2,1.5);   // front rim — slab face (no penny)
+box(3,PLAT,D-3,pennyM(),1.5,PLAT/2,(D+3)/2);              // right rim
+box(3,PLAT,D-3,pennyM(),W-1.5,PLAT/2,(D+3)/2);            // left rim
+// basin floor (penny) at 12" — 2" deep basin; 2 paw accents set in the pan
+const basinTop=texMat(pennyCanvas(W-6,D-6,[[9,8,6,Math.PI+0.08],[21,16,6.5,Math.PI-0.1]]),0.5);  // toes toward rear wall
+const basin=new THREE.Mesh(new THREE.BoxGeometry(W-6,12,D-6),
+  [pennyM(),pennyM(),basinTop,pennyM(),pennyM(),pennyM()]);
+basin.position.set(W/2,6,(D+3)/2-1.5+1.5);
+basin.position.set(W/2,6,D/2+1.5-1.5+1.5); // center over basin area
+scene.add(basin); basin.castShadow=true; basin.receiveShadow=true;
+// rim cap (slab)
+const cap=new THREE.Mesh(new THREE.BoxGeometry(W,1,3.4),texMat(slabCanvas(38,5),0.3));
+cap.position.set(W/2,PLAT+0.5,1.5); cap.castShadow=true; scene.add(cap);
+[[1.5],[W-1.5]].forEach(p=>{
+  const sc=new THREE.Mesh(new THREE.BoxGeometry(3.4,1,D-3),texMat(slabCanvas(5,32),0.3));
+  sc.position.set(p[0],PLAT+0.5,(D+3)/2); sc.castShadow=true; scene.add(sc);
+});
+// drain
+const drain=new THREE.Mesh(new THREE.BoxGeometry(3.5,0.3,3.5),chrome);
+drain.position.set(W/2,12.2,D/2+2); scene.add(drain);
+
+// ---- chrome hand shower on back wall ----
+const plate=new THREE.Mesh(new THREE.CylinderGeometry(3,3,0.5,32),chrome);
+plate.rotation.x=Math.PI/2; plate.position.set(27,PLAT+18,D-0.3); scene.add(plate);
+const lever=new THREE.Mesh(new THREE.BoxGeometry(1,1,4.5),chrome);
+lever.rotation.x=0; lever.position.set(27,PLAT+18,D-2.2); scene.add(lever);
+const bar=new THREE.Mesh(new THREE.CylinderGeometry(0.45,0.45,18,14),chrome);
+bar.position.set(27,PLAT+30,D-1.4); scene.add(bar);
+const wand=new THREE.Mesh(new THREE.CylinderGeometry(0.65,1.2,7,16),chrome);
+wand.rotation.x=-0.3; wand.position.set(27,PLAT+31,D-2.6); scene.add(wand);
+
+// lighting
+scene.add(new THREE.HemisphereLight(0xf4f2ee,0x3a3c40,0.6));
+const sun=new THREE.DirectionalLight(0xfff4e4,0.7);
+sun.position.set(-50,150,-140);
+sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left=-160; sun.shadow.camera.right=160;
+sun.shadow.camera.top=170;  sun.shadow.camera.bottom=-70;
+sun.shadow.camera.far=560;
+sun.target.position.set(W/2,0,D/2); scene.add(sun.target);
+scene.add(sun);
+const inLight=new THREE.PointLight(0xfff1dd,0.55,260,2);
+inLight.position.set(W/2,70,D/2-16);
+inLight.castShadow=true; inLight.shadow.mapSize.set(1024,1024);
+scene.add(inLight);
+const fill=new THREE.PointLight(0xe8ecf2,0.3,340,2);
+fill.position.set(W/2,45,-80); scene.add(fill);
+
+// controls
+const target=new THREE.Vector3(W/2,28,D/2-4);
+let theta=-0.3, phi=1.2, radius=150;
+let autoRotate=true, dragging=false, lastX=0, lastY=0, pinchDist=0;
+function updateCamera(){
+  phi=Math.max(0.18,Math.min(1.52,phi));
+  radius=Math.max(50,Math.min(500,radius));
+  camera.position.set(
+    target.x+radius*Math.sin(phi)*Math.sin(theta),
+    target.y+radius*Math.cos(phi),
+    target.z-radius*Math.sin(phi)*Math.cos(theta)
+  );
+  camera.lookAt(target);
+}
+const el=renderer.domElement;
+el.addEventListener('pointerdown',e=>{dragging=true;autoRotate=false;lastX=e.clientX;lastY=e.clientY;});
+window.addEventListener('pointerup',()=>dragging=false);
+window.addEventListener('pointermove',e=>{
+  if(!dragging)return;
+  theta+=(e.clientX-lastX)*0.0055;
+  phi-=(e.clientY-lastY)*0.0045;
+  lastX=e.clientX;lastY=e.clientY;
+});
+el.addEventListener('wheel',e=>{e.preventDefault();autoRotate=false;radius*=(1+Math.sign(e.deltaY)*0.08);},{passive:false});
+el.addEventListener('touchstart',e=>{
+  autoRotate=false;
+  if(e.touches.length===2){
+    pinchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+  }
+},{passive:true});
+el.addEventListener('touchmove',e=>{
+  if(e.touches.length===2){
+    const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    radius*=pinchDist/d; pinchDist=d;
+  }
+},{passive:true});
+window.addEventListener('resize',()=>{
+  camera.aspect=window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth,window.innerHeight);
+});
+(function animate(){
+  requestAnimationFrame(animate);
+  if(autoRotate) theta+=0.0016;
+  updateCamera();
+  renderer.render(scene,camera);
+})();
+})();
+</script>
+</body>
+</html>

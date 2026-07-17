@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pantry — 2464 S Saint Paul St</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#1c1e22;font-family:'Helvetica Neue',Arial,sans-serif;}
+  #app{position:fixed;inset:0;}
+  #hud{position:fixed;top:16px;left:16px;background:rgba(20,22,26,.82);color:#e8e8e6;
+       padding:14px 18px;border-radius:10px;max-width:300px;backdrop-filter:blur(6px);
+       border:1px solid rgba(255,255,255,.08);}
+  #hud h1{font-size:15px;margin:0 0 2px;font-weight:600;letter-spacing:.3px;}
+  #hud .sub{font-size:11px;color:#9aa0a8;margin-bottom:10px;}
+  #hud ul{margin:0;padding:0;list-style:none;font-size:12px;line-height:1.7;color:#c9cdd3;}
+  #hud ul b{color:#fff;font-weight:600;}
+  #hint{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);
+        color:#8b9099;font-size:12px;background:rgba(20,22,26,.7);padding:6px 14px;border-radius:20px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="hud">
+  <h1>Pantry</h1>
+  <div class="sub">2464 S Saint Paul St — 2nd Floor</div>
+  <ul>
+    <li><b>Room:</b> 156" × 83" (per cabinet plan)</li>
+    <li><b>Floor:</b> 12" × 12" marble checkerboard (white / gray), 45° diagonal set</li>
+    <li><b>Cabinets:</b> Kona brown massing per IKEA design — sink wall w/ window, tall storage</li>
+  </ul>
+</div>
+<div id="hint">Drag to orbit &nbsp;·&nbsp; Scroll / pinch to zoom</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+"use strict";
+// world +x appears LEFT from default camera. tall units = left (x high). back wall z=83.
+const W=156, D=83, H=96;
+const PX=6;
+
+function makeCanvas(wIn,hIn){
+  const c=document.createElement('canvas');
+  c.width=Math.max(4,Math.round(wIn*PX));
+  c.height=Math.max(4,Math.round(hIn*PX));
+  return c;
+}
+function veins(ctx,x,y,w,h,count,alpha,rgb){
+  for(let i=0;i<count;i++){
+    ctx.beginPath();
+    let vx=x+Math.random()*w, vy=y+Math.random()*h;
+    ctx.moveTo(vx,vy);
+    let ang=Math.random()*Math.PI*2;
+    for(let s=0;s<4;s++){
+      ang+=(Math.random()-0.5)*1.2;
+      const len=(w+h)/8*(0.3+Math.random()*0.8);
+      vx+=Math.cos(ang)*len; vy+=Math.sin(ang)*len;
+      ctx.quadraticCurveTo(vx+(Math.random()-0.5)*8,vy+(Math.random()-0.5)*8,vx,vy);
+    }
+    ctx.strokeStyle='rgba('+rgb+','+(alpha*(0.4+Math.random()*0.6)).toFixed(3)+')';
+    ctx.lineWidth=0.5+Math.random()*1.4;
+    ctx.stroke();
+  }
+}
+function finishTexture(c){
+  const t=new THREE.CanvasTexture(c);
+  t.encoding=THREE.sRGBEncoding; t.anisotropy=8;
+  return t;
+}
+// 12x12 white/gray marble checkerboard drawn at 45 degrees
+function diagCheckerCanvas(wIn,hIn){
+  const c=makeCanvas(wIn,hIn), ctx=c.getContext('2d');
+  ctx.fillStyle='#c6c6c6'; ctx.fillRect(0,0,c.width,c.height);
+  const T=12*PX, G=1.2;
+  ctx.save();
+  ctx.translate(c.width/2,c.height/2);
+  ctx.rotate(Math.PI/4);
+  const ext=Math.ceil((wIn+hIn)/12);
+  for(let i=-ext;i<=ext;i++){
+    for(let j=-ext;j<=ext;j++){
+      const x=i*T, y=j*T;
+      const gray=((i+j)%2+2)%2===0;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(x+G,y+G,T-2*G,T-2*G); ctx.clip();
+      if(gray){
+        const v=196+Math.floor(Math.random()*8)-3;
+        ctx.fillStyle='rgb('+v+','+(v+2)+','+(v+4)+')';
+        ctx.fillRect(x,y,T,T);
+        veins(ctx,x,y,T,T,2,0.25,'240,243,245');
+        veins(ctx,x,y,T,T,1,0.18,'150,155,160');
+      }else{
+        const v=245+Math.floor(Math.random()*7)-2;
+        ctx.fillStyle='rgb('+v+','+v+','+(v+1)+')';
+        ctx.fillRect(x,y,T,T);
+        veins(ctx,x,y,T,T,2,0.16,'120,128,140');
+      }
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+  return c;
+}
+function slabCanvas(wIn,hIn){
+  const c=makeCanvas(wIn,hIn), ctx=c.getContext('2d');
+  ctx.fillStyle='#f1f0ec'; ctx.fillRect(0,0,c.width,c.height);
+  veins(ctx,0,0,c.width,c.height,7,0.2,'120,128,140');
+  return c;
+}
+// sage gray-green 3x6 subway (backsplash, matches kitchen render)
+function sageSubwayCanvas(wIn,hIn){
+  const c=makeCanvas(wIn,hIn), ctx=c.getContext('2d');
+  ctx.fillStyle='#c9c5ba'; ctx.fillRect(0,0,c.width,c.height);
+  const TW=6*PX, TH=3*PX, G=1.0;
+  for(let r=0;r<Math.ceil(hIn/3)+1;r++){
+    const off=(r%2)? -TW/2 : 0;
+    for(let col=-1; col<=Math.ceil(wIn/6)+1; col++){
+      const x=col*TW+off, y=r*TH;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(x+G,y+G,TW-2*G,TH-2*G); ctx.clip();
+      const t=Math.random();
+      ctx.fillStyle='rgb('+Math.round(150+t*18)+','+Math.round(158+t*16)+','+Math.round(146+t*14)+')';
+      ctx.fillRect(x,y,TW,TH);
+      ctx.fillStyle='rgba(255,255,255,'+(0.05+Math.random()*0.08)+')';
+      ctx.fillRect(x,y,TW,TH/3);
+      ctx.restore();
+    }
+  }
+  return c;
+}
+
+function texMat(canvas,rough){
+  return new THREE.MeshStandardMaterial({map:finishTexture(canvas),roughness:rough,metalness:0.02});
+}
+const kona=new THREE.MeshStandardMaterial({color:0x362a20,roughness:0.55});
+const wallMat=new THREE.MeshStandardMaterial({color:0xd9d4cc,roughness:0.9});
+const whitePaint=new THREE.MeshStandardMaterial({color:0xf2f1ee,roughness:0.6});
+const steel=new THREE.MeshStandardMaterial({color:0xb9bcc0,roughness:0.35,metalness:0.8});
+const black=new THREE.MeshStandardMaterial({color:0x1d1f22,roughness:0.4,metalness:0.5});
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x24262b);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.setSize(window.innerWidth,window.innerHeight);
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputEncoding=THREE.sRGBEncoding;
+document.getElementById('app').appendChild(renderer.domElement);
+const camera=new THREE.PerspectiveCamera(46,window.innerWidth/window.innerHeight,1,3000);
+
+function box(w,h,d,mat,x,y,z){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+  m.position.set(x,y,z);
+  m.castShadow=true; m.receiveShadow=true;
+  scene.add(m); return m;
+}
+
+// floor
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(W,D),texMat(diagCheckerCanvas(W,D),0.35));
+floor.rotation.x=-Math.PI/2;
+floor.position.set(W/2,0.02,D/2);
+floor.receiveShadow=true;
+scene.add(floor);
+
+// walls: back z=D (subway full height), left x=W, right x=0
+const backWall=box(W+8,H,4,wallMat,W/2,H/2,D+2);   // painted wall — no backsplash tile specified
+box(4,H,D+4,wallMat,W+2,H/2,D/2);
+box(4,H,D+4,wallMat,-2,H/2,D/2);
+const ceil=new THREE.Mesh(new THREE.PlaneGeometry(W+8,D+8),whitePaint);
+ceil.rotation.x=Math.PI/2; ceil.position.set(W/2,H,D/2); scene.add(ceil);
+
+// window centered over sink: 48x36, sill 42
+const wframe=new THREE.Mesh(new THREE.BoxGeometry(50,38,1.5),whitePaint);
+wframe.position.set(W/2,60,D-2.2); scene.add(wframe);
+const pane=new THREE.Mesh(new THREE.PlaneGeometry(46,34),
+  new THREE.MeshPhysicalMaterial({color:0xe8f1f6,transparent:true,opacity:0.5,roughness:0.05}));
+pane.rotation.y=Math.PI; pane.position.set(W/2,60,D-2.9); scene.add(pane);
+
+// ---- back wall run: bases + counter + uppers ----
+box(148,34.5,24,kona,W/2,17.25,D-12);                          // base run
+const counter=new THREE.Mesh(new THREE.BoxGeometry(152,1.8,25.5),texMat(slabCanvas(152,26),0.25));
+counter.position.set(W/2,35.4,D-12.5); counter.castShadow=true; counter.receiveShadow=true; scene.add(counter);
+// uppers flanking window
+box(38,36,13,kona,27,74,D-6.5);
+box(38,36,13,kona,W-27,74,D-6.5);
+// microwave (stainless, in base run right of sink)
+box(24,16,1.5,steel,44,20,D-23.6);
+// beverage cooler (stainless front, left end)
+box(22,28,1.5,steel,W-19,16,D-23.6);
+// sink + black faucet under window
+box(18,1,14,black,W/2,36.4,D-14);
+const riser=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,10,12),black);
+riser.position.set(W/2-8,41,D-19); scene.add(riser);
+const spout=new THREE.Mesh(new THREE.CylinderGeometry(0.45,0.45,8,12),black);
+spout.rotation.x=Math.PI/2; spout.position.set(W/2-8,46,D-15.5); scene.add(spout);
+
+// ---- left wall: tall pantry storage + counter section ----
+box(26,90,44,kona,W-13,45,28);          // tall unit (fridge/freezer + pantry)
+box(24,34.5,26,kona,W-12,17.25,63);     // base beyond tall
+const counter2=new THREE.Mesh(new THREE.BoxGeometry(25.5,1.8,28),texMat(slabCanvas(28,30),0.25));
+counter2.position.set(W-12.5,35.4,63); counter2.castShadow=true; scene.add(counter2);
+box(13,30,26,kona,W-6.5,72,63);         // upper above
+
+// lighting
+scene.add(new THREE.HemisphereLight(0xf4f2ee,0x3a3c40,0.6));
+const sun=new THREE.DirectionalLight(0xfff4e4,0.7);
+sun.position.set(-60,180,-160);
+sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left=-220; sun.shadow.camera.right=220;
+sun.shadow.camera.top=220;  sun.shadow.camera.bottom=-80;
+sun.shadow.camera.far=700;
+sun.target.position.set(W/2,0,D/2); scene.add(sun.target);
+scene.add(sun);
+const dayLight=new THREE.PointLight(0xeaf2f8,0.4,400,2);
+dayLight.position.set(W/2,64,D+18); dayLight.castShadow=true; scene.add(dayLight);
+const sky=new THREE.Mesh(new THREE.PlaneGeometry(220,150),
+  new THREE.MeshBasicMaterial({color:0xd7e4ec}));
+sky.rotation.y=Math.PI; sky.position.set(W/2,66,D+42); scene.add(sky);
+const inLight=new THREE.PointLight(0xfff1dd,0.5,400,2);
+inLight.position.set(W/2,H-8,D/2-10);
+inLight.castShadow=true; inLight.shadow.mapSize.set(1024,1024);
+scene.add(inLight);
+const fill=new THREE.PointLight(0xe8ecf2,0.3,500,2);
+fill.position.set(W/2,60,-100); scene.add(fill);
+
+// controls
+const target=new THREE.Vector3(W/2,36,D/2-4);
+let theta=-0.3, phi=1.18, radius=280;
+let autoRotate=true, dragging=false, lastX=0, lastY=0, pinchDist=0;
+function updateCamera(){
+  phi=Math.max(0.18,Math.min(1.52,phi));
+  radius=Math.max(90,Math.min(700,radius));
+  camera.position.set(
+    target.x+radius*Math.sin(phi)*Math.sin(theta),
+    target.y+radius*Math.cos(phi),
+    target.z-radius*Math.sin(phi)*Math.cos(theta)
+  );
+  camera.lookAt(target);
+}
+const el=renderer.domElement;
+el.addEventListener('pointerdown',e=>{dragging=true;autoRotate=false;lastX=e.clientX;lastY=e.clientY;});
+window.addEventListener('pointerup',()=>dragging=false);
+window.addEventListener('pointermove',e=>{
+  if(!dragging)return;
+  theta+=(e.clientX-lastX)*0.0055;
+  phi-=(e.clientY-lastY)*0.0045;
+  lastX=e.clientX;lastY=e.clientY;
+});
+el.addEventListener('wheel',e=>{e.preventDefault();autoRotate=false;radius*=(1+Math.sign(e.deltaY)*0.08);},{passive:false});
+el.addEventListener('touchstart',e=>{
+  autoRotate=false;
+  if(e.touches.length===2){
+    pinchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+  }
+},{passive:true});
+el.addEventListener('touchmove',e=>{
+  if(e.touches.length===2){
+    const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    radius*=pinchDist/d; pinchDist=d;
+  }
+},{passive:true});
+window.addEventListener('resize',()=>{
+  camera.aspect=window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth,window.innerHeight);
+});
+(function animate(){
+  requestAnimationFrame(animate);
+  if(autoRotate) theta+=0.0016;
+  updateCamera();
+  renderer.render(scene,camera);
+})();
+})();
+</script>
+</body>
+</html>

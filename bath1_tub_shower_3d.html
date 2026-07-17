@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bath #1 — Option B2: 2-Row Ceiling Band — 2464 S Saint Paul St</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#1c1e22;font-family:'Helvetica Neue',Arial,sans-serif;}
+  #app{position:fixed;inset:0;}
+  #hud{position:fixed;top:16px;left:16px;background:rgba(20,22,26,.82);color:#e8e8e6;
+       padding:14px 18px;border-radius:10px;max-width:300px;backdrop-filter:blur(6px);
+       border:1px solid rgba(255,255,255,.08);}
+  #hud h1{font-size:15px;margin:0 0 2px;font-weight:600;letter-spacing:.3px;}
+  #hud .sub{font-size:11px;color:#9aa0a8;margin-bottom:10px;}
+  #hud ul{margin:0;padding:0;list-style:none;font-size:12px;line-height:1.7;color:#c9cdd3;}
+  #hud ul b{color:#fff;font-weight:600;}
+  #hint{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);
+        color:#8b9099;font-size:12px;background:rgba(20,22,26,.7);padding:6px 14px;border-radius:20px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="hud">
+  <h1>Bath #1 — Option B2: 2-Row Ceiling Band</h1>
+  <div class="sub">2464 S Saint Paul St — 3rd Floor</div>
+  <ul>
+    <li><b>Tub:</b> 60" × 30" alcove, tub/shower combo</li>
+    <li><b>Surround:</b> 11.81" × 5.9" fluted tile laid horizontally, stacked set, flutes vertical, to ceiling</li>
+    <li><b>Wet wall:</b> right</li>
+    <li><b>Niche:</b> 24" × 12" on back wall — arch accent tile</li>
+    <li><b>Accent band:</b> 8" arch-tile band (2 rows) at the ceiling (88"-96")</li>
+    <li><b>Floor:</b> 12" × 24" limestone-look, running lengthwise</li>
+  </ul>
+</div>
+<div id="hint">Drag to orbit &nbsp;·&nbsp; Scroll / pinch to zoom</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+"use strict";
+// ---------- layout (inches) ----------
+// world +x appears LEFT from the default front camera.
+// wet wall (viewed RIGHT) = x 0. left end wall = x 60. back wall = z 30. open front z<0.
+const W=60, AD=30, H=96;         // alcove width, depth, ceiling
+const TUB_H=20;
+const ROOM_Z0=-42;               // room floor extends toward viewer
+const PX=8;
+
+// ---------- canvas helpers ----------
+function makeCanvas(wIn,hIn){
+  const c=document.createElement('canvas');
+  c.width=Math.max(4,Math.round(wIn*PX));
+  c.height=Math.max(4,Math.round(hIn*PX));
+  return c;
+}
+function speckle(ctx,x,y,w,h,n,light){
+  for(let i=0;i<n;i++){
+    const px=x+Math.random()*w, py=y+Math.random()*h, r=0.4+Math.random()*1.6;
+    ctx.beginPath(); ctx.arc(px,py,r,0,7);
+    ctx.fillStyle=light?'rgba(255,255,252,'+(0.15+Math.random()*0.3).toFixed(2)+')'
+                       :'rgba(160,150,135,'+(0.06+Math.random()*0.12).toFixed(2)+')';
+    ctx.fill();
+  }
+}
+function warmClouds(ctx,x,y,w,h,n,alpha){
+  for(let i=0;i<n;i++){
+    const gx=x+Math.random()*w, gy=y+Math.random()*h, r=(w+h)/6*(0.4+Math.random());
+    const g=ctx.createRadialGradient(gx,gy,0,gx,gy,r);
+    g.addColorStop(0,'rgba(205,192,172,'+alpha+')');
+    g.addColorStop(1,'rgba(205,192,172,0)');
+    ctx.fillStyle=g; ctx.fillRect(x,y,w,h);
+  }
+}
+function finishTexture(c){
+  const t=new THREE.CanvasTexture(c);
+  t.encoding=THREE.sRGBEncoding;
+  t.anisotropy=8;
+  return t;
+}
+// 12x24 limestone-look, half-offset, 24" running along canvas-x (room length)
+function limestoneCanvas(wIn,hIn){
+  const c=makeCanvas(wIn,hIn), ctx=c.getContext('2d');
+  ctx.fillStyle='#c9c4bb'; ctx.fillRect(0,0,c.width,c.height);
+  const TW=24*PX, TH=12*PX, G=1.4;
+  const rows=Math.ceil(hIn/12)+1;
+  for(let r=0;r<rows;r++){
+    const off=(r%2)? -TW/2 : 0;
+    for(let col=-1; col<=Math.ceil(wIn/24)+1; col++){
+      const x=col*TW+off, y=r*TH;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(x+G,y+G,TW-2*G,TH-2*G); ctx.clip();
+      const s=235+Math.floor(Math.random()*10)-3;
+      ctx.fillStyle='rgb('+s+','+(s-3)+','+(s-10)+')';
+      ctx.fillRect(x,y,TW,TH);
+      warmClouds(ctx,x,y,TW,TH,3,0.10);
+      speckle(ctx,x,y,TW,TH,90,true);
+      speckle(ctx,x,y,TW,TH,60,false);
+      ctx.restore();
+    }
+  }
+  return c;
+}
+// fluted glossy tile laid horizontally: 11.81"w x 5.9"h, stacked grid,
+// flutes run the tile WIDTH (vertical on the wall, ~1" pitch)
+function flutedCanvas(wIn,hIn){
+  const c=makeCanvas(wIn,hIn), ctx=c.getContext('2d');
+  ctx.fillStyle='#e8e2d8'; ctx.fillRect(0,0,c.width,c.height);
+  const TW=11.81*PX, TH=5.9*PX, G=1.1;
+  for(let r=0;r<Math.ceil(hIn/5.9)+1;r++){
+    for(let col=0; col<=Math.ceil(wIn/11.81)+1; col++){
+      const x=col*TW, y=r*TH;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(x+G,y+G,TW-2*G,TH-2*G); ctx.clip();
+      // base: cream with occasional warm greige blotching
+      const warm=Math.random();
+      const br=244-warm*10, bg=240-warm*14, bb=232-warm*20;
+      ctx.fillStyle='rgb('+Math.round(br)+','+Math.round(bg)+','+Math.round(bb)+')';
+      ctx.fillRect(x,y,TW,TH);
+      warmClouds(ctx,x,y,TW,TH,2,0.16);
+      // 12 vertical flutes across the tile width
+      const fw=TW/12;
+      for(let f=0;f<12;f++){
+        const fx=x+f*fw;
+        const g=ctx.createLinearGradient(fx,0,fx+fw,0);
+        g.addColorStop(0.00,'rgba(110,95,75,0.30)');
+        g.addColorStop(0.16,'rgba(200,190,175,0.05)');
+        g.addColorStop(0.34,'rgba(255,255,252,0.55)');
+        g.addColorStop(0.48,'rgba(255,255,255,0.18)');
+        g.addColorStop(0.72,'rgba(150,132,108,0.16)');
+        g.addColorStop(1.00,'rgba(95,80,62,0.32)');
+        ctx.fillStyle=g; ctx.fillRect(fx,y,fw,TH);
+        // crisp specular streak
+        ctx.fillStyle='rgba(255,255,255,0.35)';
+        ctx.fillRect(fx+fw*0.36,y,1.2,TH);
+      }
+      ctx.restore();
+    }
+  }
+  return c;
+}
+// 4" arch accent tile (cream arch on terracotta ground)
+function archCanvas(wIn,hIn){
+  const c=makeCanvas(wIn,hIn), ctx=c.getContext('2d');
+  ctx.fillStyle='#ded7cc'; ctx.fillRect(0,0,c.width,c.height);
+  const T=4*PX, G=1.0;
+  for(let r=0;r<Math.ceil(hIn/4);r++){
+    for(let col=0; col<Math.ceil(wIn/4);col++){
+      const x=col*T, y=r*T;
+      ctx.save();
+      ctx.beginPath(); ctx.rect(x+G,y+G,T-2*G,T-2*G); ctx.clip();
+      // terracotta ground
+      ctx.fillStyle='rgb('+(232+Math.floor(Math.random()*10))+','+(196+Math.floor(Math.random()*12))+','+(158+Math.floor(Math.random()*14))+')';
+      ctx.fillRect(x,y,T,T);
+      // cream arch, shoulders ~45% down
+      const s=2.5, cx=x+T/2, shoulderY=y+T*0.45, rad=T/2-s;
+      ctx.beginPath();
+      ctx.moveTo(x+s, y+T);
+      ctx.lineTo(x+s, shoulderY);
+      ctx.arc(cx, shoulderY, rad, Math.PI, 0);
+      ctx.lineTo(x+T-s, y+T);
+      ctx.closePath();
+      const cr=243+Math.floor(Math.random()*8)-3;
+      ctx.fillStyle='rgb('+cr+','+(cr-4)+','+(cr-13)+')';
+      ctx.fill();
+      speckle(ctx,x,y,T,T,6,false);
+      ctx.restore();
+    }
+  }
+  return c;
+}
+// plain limestone slab (niche jambs/shelf)
+function stoneSlab(wIn,hIn){
+  const c=makeCanvas(wIn,hIn), ctx=c.getContext('2d');
+  ctx.fillStyle='#eceade'; ctx.fillRect(0,0,c.width,c.height);
+  warmClouds(ctx,0,0,c.width,c.height,4,0.12);
+  speckle(ctx,0,0,c.width,c.height,160,true);
+  speckle(ctx,0,0,c.width,c.height,100,false);
+  return c;
+}
+
+// ---------- materials ----------
+function texMat(canvas,rough){
+  return new THREE.MeshStandardMaterial({map:finishTexture(canvas),roughness:rough,metalness:0.02});
+}
+function croppedMat(baseTex,offX,offY,repX,repY,rough){
+  const t=baseTex.clone(); t.needsUpdate=true;
+  t.offset.set(offX,offY); t.repeat.set(repX,repY);
+  return new THREE.MeshStandardMaterial({map:t,roughness:rough,metalness:0.02});
+}
+const whiteMat=new THREE.MeshStandardMaterial({color:0xe9e7e2,roughness:0.9});
+const tubMat=new THREE.MeshStandardMaterial({color:0xf7f7f5,roughness:0.15,metalness:0.0});
+const chrome=new THREE.MeshStandardMaterial({color:0xd8dde2,roughness:0.18,metalness:0.95});
+
+// ---------- scene ----------
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x24262b);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.setSize(window.innerWidth,window.innerHeight);
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputEncoding=THREE.sRGBEncoding;
+document.getElementById('app').appendChild(renderer.domElement);
+const camera=new THREE.PerspectiveCamera(46,window.innerWidth/window.innerHeight,1,2000);
+
+function box(w,h,d,mats,x,y,z){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mats);
+  m.position.set(x,y,z);
+  m.castShadow=true; m.receiveShadow=true;
+  scene.add(m); return m;
+}
+
+// ----- floor: limestone plank running lengthwise (24" along x) -----
+const roomDepth=AD-ROOM_Z0;
+const floorMesh=new THREE.Mesh(
+  new THREE.PlaneGeometry(W,roomDepth),
+  texMat(limestoneCanvas(W,roomDepth),0.55)
+);
+floorMesh.rotation.x=-Math.PI/2;
+floorMesh.position.set(W/2,0.02,(AD+ROOM_Z0)/2);
+floorMesh.receiveShadow=true;
+scene.add(floorMesh);
+
+// ----- surround walls with arch-accent band option -----
+const BAND_NICHE=false, BAND_TOP=true;
+const NW=24,NHt=12,NX0=(W-NW)/2,NX1=NX0+NW,NY0=47,NY1=NY0+NHt,ND=3.5; // niche bottom 42" above tub floor
+const BT0=88,BT1=96;
+function bandList(){const b=[];if(BAND_NICHE)b.push([NY0,NY1]);if(BAND_TOP)b.push([BT0,BT1]);return b;}
+function wallSegs(){
+  const cuts=[0,H,NY0,NY1];
+  bandList().forEach(b=>{cuts.push(b[0],b[1]);});
+  const u=[...new Set(cuts)].sort((a,b)=>a-b);
+  const segs=[];
+  for(let i=0;i<u.length-1;i++){
+    const mid=(u[i]+u[i+1])/2;
+    segs.push([u[i],u[i+1],bandList().some(b=>mid>b[0]&&mid<b[1])]);
+  }
+  return segs;
+}
+function sideWall(cx,idx){
+  const base=finishTexture(flutedCanvas(AD,H));
+  wallSegs().forEach(sg=>{
+    const mats=[whiteMat,whiteMat,whiteMat,whiteMat,whiteMat,whiteMat];
+    mats[idx]=sg[2]?texMat(archCanvas(AD,sg[1]-sg[0]),0.3)
+                   :croppedMat(base,0,sg[0]/H,1,(sg[1]-sg[0])/H,0.12);
+    box(4,sg[1]-sg[0],AD,mats,cx,(sg[0]+sg[1])/2,AD/2);
+  });
+}
+sideWall(W+2,1);   // left end wall
+sideWall(-2,0);    // wet wall (viewed right)
+
+// back wall (z=30) with niche opening
+const backTex=finishTexture(flutedCanvas(W,H));
+function backPiece(x0,x1,y0,y1,acc){
+  if(x1-x0<0.01||y1-y0<0.01)return;
+  const mat=acc?texMat(archCanvas(x1-x0,y1-y0),0.3)
+               :croppedMat(backTex,(W-x1)/W,y0/H,(x1-x0)/W,(y1-y0)/H,0.12);
+  box(x1-x0,y1-y0,4,[whiteMat,whiteMat,whiteMat,whiteMat,whiteMat,mat],
+      (x0+x1)/2,(y0+y1)/2,AD+2);
+}
+wallSegs().forEach(sg=>{
+  if(sg[1]<=NY0||sg[0]>=NY1){ backPiece(0,W,sg[0],sg[1],sg[2]); }
+  else{ backPiece(0,NX0,sg[0],sg[1],sg[2]); backPiece(NX1,W,sg[0],sg[1],sg[2]); }
+});
+// niche interior: limestone slab shelf/jambs, arch accent on back
+const slabM=()=>texMat(stoneSlab(26,14),0.4);
+box(NW,0.75,ND,slabM(),(NX0+NX1)/2,NY0+0.38,AD+ND/2);
+box(NW,0.75,ND,slabM(),(NX0+NX1)/2,NY1-0.38,AD+ND/2);
+box(0.75,NHt,ND,slabM(),NX0+0.38,(NY0+NY1)/2,AD+ND/2);
+box(0.75,NHt,ND,slabM(),NX1-0.38,(NY0+NY1)/2,AD+ND/2);
+const nicheBack=new THREE.Mesh(new THREE.PlaneGeometry(NW,NHt),texMat(archCanvas(NW,NHt),0.3));
+nicheBack.rotation.y=Math.PI;
+nicheBack.position.set(W/2,(NY0+NY1)/2,AD+ND-0.05);
+nicheBack.receiveShadow=true;
+scene.add(nicheBack);
+
+// ----- ceiling -----
+const ceil=new THREE.Mesh(new THREE.PlaneGeometry(W+10,roomDepth+10),whiteMat);
+ceil.rotation.x=Math.PI/2;
+ceil.position.set(W/2,H,(AD+ROOM_Z0)/2);
+scene.add(ceil);
+
+// ----- alcove tub (60 x 30, rim at 20") -----
+box(W,TUB_H,4, tubMat, W/2,TUB_H/2,2);            // front apron band (z 0..4)
+box(W,TUB_H,4, tubMat, W/2,TUB_H/2,AD-2);         // back band
+box(3,TUB_H,AD-8, tubMat, W-1.5,TUB_H/2,AD/2);    // left band
+box(3,TUB_H,AD-8, tubMat, 1.5,TUB_H/2,AD/2);      // right band
+box(W-6,5,AD-8, tubMat, W/2,2.5,AD/2);            // basin floor
+// tub drain
+const tdrain=new THREE.Mesh(new THREE.CylinderGeometry(1.4,1.4,0.3,24),chrome);
+tdrain.position.set(10,5.2,AD/2); scene.add(tdrain);
+
+// ----- fixtures on wet wall -----
+const arm=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,14,16),chrome);
+arm.rotation.z=Math.PI/2; arm.position.set(7,78,AD/2); scene.add(arm);
+const drop=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,2.2,16),chrome);
+drop.position.set(13.6,76.9,AD/2); scene.add(drop);
+const head=new THREE.Mesh(new THREE.CylinderGeometry(4.5,4.5,0.7,40),chrome);
+head.position.set(13.6,75.7,AD/2); head.castShadow=true; scene.add(head);
+const plate=new THREE.Mesh(new THREE.CylinderGeometry(3.4,3.4,0.5,32),chrome);
+plate.rotation.z=Math.PI/2; plate.position.set(0.3,38,AD/2); scene.add(plate);
+const lever=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.1,5),chrome);
+lever.position.set(1.5,38,AD/2+2); scene.add(lever);
+// tub spout
+const spout=new THREE.Mesh(new THREE.CylinderGeometry(0.8,0.8,6,16),chrome);
+spout.rotation.z=Math.PI/2; spout.position.set(3,26,AD/2); scene.add(spout);
+const spoutTip=new THREE.Mesh(new THREE.CylinderGeometry(0.8,0.8,1.8,16),chrome);
+spoutTip.position.set(5.7,25.1,AD/2); scene.add(spoutTip);
+
+// ---------- lighting ----------
+scene.add(new THREE.HemisphereLight(0xf4f2ee,0x3a3c40,0.55));
+const sun=new THREE.DirectionalLight(0xfff4e4,0.75);
+sun.position.set(-50,150,-140);
+sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left=-150; sun.shadow.camera.right=150;
+sun.shadow.camera.top=170;  sun.shadow.camera.bottom=-60;
+sun.shadow.camera.far=520;
+sun.target.position.set(W/2,0,AD/2); scene.add(sun.target);
+scene.add(sun);
+const inLight=new THREE.PointLight(0xfff1dd,0.55,220,2);
+inLight.position.set(W/2,H-6,AD/2-10);
+inLight.castShadow=true;
+inLight.shadow.mapSize.set(1024,1024);
+scene.add(inLight);
+const fill=new THREE.PointLight(0xe8ecf2,0.28,320,2);
+fill.position.set(W/2,55,-70); scene.add(fill);
+
+// ---------- orbit controls ----------
+const target=new THREE.Vector3(W/2,40,4);
+let theta=-0.32, phi=1.22, radius=200;
+let autoRotate=true, dragging=false, lastX=0, lastY=0, pinchDist=0;
+function updateCamera(){
+  phi=Math.max(0.18,Math.min(1.52,phi));
+  radius=Math.max(60,Math.min(440,radius));
+  camera.position.set(
+    target.x+radius*Math.sin(phi)*Math.sin(theta),
+    target.y+radius*Math.cos(phi),
+    target.z-radius*Math.sin(phi)*Math.cos(theta)
+  );
+  camera.lookAt(target);
+}
+const el=renderer.domElement;
+el.addEventListener('pointerdown',e=>{dragging=true;autoRotate=false;lastX=e.clientX;lastY=e.clientY;});
+window.addEventListener('pointerup',()=>dragging=false);
+window.addEventListener('pointermove',e=>{
+  if(!dragging)return;
+  theta+=(e.clientX-lastX)*0.0055;
+  phi-=(e.clientY-lastY)*0.0045;
+  lastX=e.clientX;lastY=e.clientY;
+});
+el.addEventListener('wheel',e=>{e.preventDefault();autoRotate=false;radius*=(1+Math.sign(e.deltaY)*0.08);},{passive:false});
+el.addEventListener('touchstart',e=>{
+  autoRotate=false;
+  if(e.touches.length===2){
+    pinchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+  }
+},{passive:true});
+el.addEventListener('touchmove',e=>{
+  if(e.touches.length===2){
+    const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    radius*=pinchDist/d; pinchDist=d;
+  }
+},{passive:true});
+
+window.addEventListener('resize',()=>{
+  camera.aspect=window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth,window.innerHeight);
+});
+
+// ---------- loop ----------
+(function animate(){
+  requestAnimationFrame(animate);
+  if(autoRotate) theta+=0.0018;
+  updateCamera();
+  renderer.render(scene,camera);
+})();
+})();
+</script>
+</body>
+</html>
