@@ -10,6 +10,8 @@
   #hud{position:fixed;top:16px;left:16px;background:rgba(20,22,26,.82);color:#e8e8e6;
        padding:14px 18px;border-radius:10px;max-width:300px;backdrop-filter:blur(6px);
        border:1px solid rgba(255,255,255,.08);}
+  #hud summary{cursor:pointer;list-style:none;}
+  #hud summary::-webkit-details-marker{display:none;}
   #hud h1{font-size:15px;margin:0 0 2px;font-weight:600;letter-spacing:.3px;}
   #hud .sub{font-size:11px;color:#9aa0a8;margin-bottom:10px;}
   #hud ul{margin:0;padding:0;list-style:none;font-size:12px;line-height:1.7;color:#c9cdd3;}
@@ -20,15 +22,14 @@
 </head>
 <body>
 <div id="app"></div>
-<div id="hud">
-  <h1>Pantry</h1>
-  <div class="sub">2464 S Saint Paul St — 2nd Floor</div>
+<details id="hud">
+  <summary><h1>Pantry</h1><div class="sub">2464 S Saint Paul St — 2nd Floor &nbsp;·&nbsp; click for specs</div></summary>
   <ul>
     <li><b>Room:</b> 156" × 83" (per cabinet plan)</li>
     <li><b>Floor:</b> 12" × 12" marble checkerboard (white / gray), 45° diagonal set</li>
     <li><b>Cabinets:</b> Kona brown massing per IKEA design — sink wall w/ window, tall storage</li>
   </ul>
-</div>
+</details>
 <div id="hint">Drag to orbit &nbsp;·&nbsp; Scroll / pinch to zoom</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
