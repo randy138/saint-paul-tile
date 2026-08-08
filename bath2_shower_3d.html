@@ -258,7 +258,7 @@ box(NW,0.75,ND,slabM(),(NX0+NX1)/2,NY0+0.38,D+ND/2);
 box(NW,0.75,ND,slabM(),(NX0+NX1)/2,NY1-0.38,D+ND/2);
 box(0.75,NHt,ND,slabM(),NX0+0.38,(NY0+NY1)/2,D+ND/2);
 box(0.75,NHt,ND,slabM(),NX1-0.38,(NY0+NY1)/2,D+ND/2);
-const nicheBack=new THREE.Mesh(new THREE.PlaneGeometry(NW,NHt),texMat(greenStackCanvas(NW,NHt),0.25));
+const nicheBack=new THREE.Mesh(new THREE.PlaneGeometry(NW,NHt),texMat(greenStackCanvas(NW,NHt,6),0.25));
 nicheBack.rotation.y=Math.PI;
 nicheBack.position.set(W/2,(NY0+NY1)/2,D+ND-0.05);
 nicheBack.receiveShadow=true;
