@@ -28,7 +28,7 @@
     <li><b>Alcove:</b> 41" W × 34" D, curb entry</li>
     <li><b>Walls:</b> 2" × 8" green marble, vertical stacked set, to ceiling</li>
     <li><b>Wet wall:</b> left</li>
-    <li><b>Niche:</b> 24" × 12" on back wall</li>
+    <li><b>Niche:</b> 24" × 12" on back wall — vertical stack, tile cut to 6" for two even courses</li>
     <li><b>Pan:</b> penny round mosaic</li>
     <li><b>Floor:</b> 12" × 24" warm white, running lengthwise of the shower</li>
     <li><b>Glass:</b> frameless fixed panel + door · gold fixtures</li>
@@ -87,14 +87,19 @@ function finishTexture(c){
   t.anisotropy=8;
   return t;
 }
-// 2"h x 8"w green marble, horizontal stacked grid
-function greenStackCanvas(wIn,hIn){
+// 2"w x 8"h green marble, VERTICAL stacked grid (grout lines align in both directions)
+// tileHin: optional course height override. Walls run the full 8" tile (96" = 12 exact
+//          courses). The 12" niche back passes 6 so the tiler cuts to 6" and gets two
+//          even courses instead of a 2" sliver — no 2x2 chips in the niche corners.
+function greenStackCanvas(wIn,hIn,tileHin){
   const c=makeCanvas(wIn,hIn), ctx=c.getContext('2d');
   ctx.fillStyle='#e9e7e1'; ctx.fillRect(0,0,c.width,c.height);
-  const TWin=2, THin=tileHin||8;
-  const TW=TWin*PX, TH=THin*PX, G=1.0;
-  for(let r=0;r<Math.ceil(hIn/THin)+1;r++){
-    for(let col=0; col<=Math.ceil(wIn/TWin)+1; col++){
+  const TWin=2, THin=tileHin||8;        // tile face: 2" wide x 8" tall (6" cut in the niche)
+  const TW=TWin*PX, TH=THin*PX, G=1.0;  // G = grout half-joint in canvas px
+  const rows=Math.ceil(hIn/THin)+1;
+  const cols=Math.ceil(wIn/TWin)+1;
+  for(let r=0;r<rows;r++){
+    for(let col=0; col<=cols; col++){
       const x=col*TW, y=r*TH;
       ctx.save();
       ctx.beginPath(); ctx.rect(x+G,y+G,TW-2*G,TH-2*G); ctx.clip();
@@ -113,7 +118,7 @@ function greenStackCanvas(wIn,hIn){
   return c;
 }
 // green marble slab (niche returns)
-function greenStackCanvas(wIn,hIn,tileHin){
+function greenSlabCanvas(wIn,hIn){
   const c=makeCanvas(wIn,hIn), ctx=c.getContext('2d');
   ctx.fillStyle='#b4c8ba'; ctx.fillRect(0,0,c.width,c.height);
   clouds(ctx,0,0,c.width,c.height,5,'238,244,238',0.30);
@@ -252,7 +257,7 @@ backPiece(0,W,0,NY0);
 backPiece(0,W,NY1,H);
 backPiece(0,NX0,NY0,NY1);
 backPiece(NX1,W,NY0,NY1);
-// niche interior: green slab returns, stacked green on back
+// niche interior: green slab returns, vertical stack on back cut to 6" (two even courses)
 const slabM=()=>texMat(greenSlabCanvas(26,14),0.22);
 box(NW,0.75,ND,slabM(),(NX0+NX1)/2,NY0+0.38,D+ND/2);
 box(NW,0.75,ND,slabM(),(NX0+NX1)/2,NY1-0.38,D+ND/2);
